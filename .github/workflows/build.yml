@@ -1,0 +1,44 @@
+name: "build"
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          components: rustfmt
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Create Release Artifacts
+        run: |
+            mkdir -p artifacts
+            if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+                cp target/release/auto-get-ustb-ammeter artifacts/auto-get-ustb-ammeter-linux
+            elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+                cp target/release/auto-get-ustb-ammeter artifacts/auto-get-ustb-ammeter-macos
+            elif [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+                cp target/release/auto-get-ustb-ammeter.exe artifacts/auto-get-ustb-ammeter.exe
+            fi
+
+      - name: Upload Release Artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: Rust Binaries
+          path: artifacts/
