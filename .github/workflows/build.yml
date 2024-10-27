@@ -1,9 +1,9 @@
-name: "build"
+name: "build-and-release"
 
 on:
   push:
-    branches:
-      - master
+    tags:
+      - v*
 
 jobs:
   build:
@@ -14,7 +14,7 @@ jobs:
 
     steps:
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
@@ -26,19 +26,60 @@ jobs:
       - name: Build
         run: cargo build --release
 
-      - name: Create Release Artifacts
-        run: |
-            mkdir -p artifacts
-            if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
-                cp target/release/auto-get-ustb-ammeter artifacts/auto-get-ustb-ammeter-linux
-            elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
-                cp target/release/auto-get-ustb-ammeter artifacts/auto-get-ustb-ammeter-macos
-            elif [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-                cp target/release/auto-get-ustb-ammeter.exe artifacts/auto-get-ustb-ammeter.exe
-            fi
+      - name: Create Artifacts Directory (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: mkdir -p artifacts
+
+      - name: Create Artifacts Directory (Windows)
+        if: runner.os == 'Windows'
+        run: mkdir artifacts
+
+      - name: Copy Artifact for Linux
+        if: matrix.os == 'ubuntu-latest'
+        run: cp target/release/auto-get-ustb-ammeter artifacts/auto-get-ustb-ammeter-linux
+
+      - name: Copy Artifact for macOS
+        if: matrix.os == 'macos-latest'
+        run: cp target/release/auto-get-ustb-ammeter artifacts/auto-get-ustb-ammeter-macos
+
+      - name: Copy Artifact for Windows
+        if: matrix.os == 'windows-latest'
+        run: copy target\release\auto-get-ustb-ammeter.exe artifacts\auto-get-ustb-ammeter-windows.exe
 
       - name: Upload Release Artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
-          name: Rust Binaries
+          name: Rust-Binary-${{ matrix.os }}
           path: artifacts/
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Artifacts (Linux)
+        uses: actions/download-artifact@v4
+        with:
+          name: Rust-Binary-ubuntu-latest
+          path: artifacts/linux
+
+      - name: Download Artifacts (macOS)
+        uses: actions/download-artifact@v4
+        with:
+          name: Rust-Binary-macos-latest
+          path: artifacts/macos
+
+      - name: Download Artifacts (Windows)
+        uses: actions/download-artifact@v4
+        with:
+          name: Rust-Binary-windows-latest
+          path: artifacts/windows
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/linux/*
+            artifacts/macos/*
+            artifacts/windows/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
