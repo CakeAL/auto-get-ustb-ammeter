@@ -11,20 +11,22 @@ pub struct AmmeterData {
     status_code: String,
 }
 
-pub async fn get_ammeter(num: u32) -> Result<Option<i32>, Box<dyn std::error::Error>> {
+pub async fn get_ammeter(num: u32) -> Result<Option<i32>, String> {
+    dbg!(num);
     let response = Client::new()
         .post("http://fspapp.ustb.edu.cn/app.GouDian/index.jsp?m=alipay&c=AliPay&a=getDbYe")
         .header("Content-Type", "application/x-www-form-urlencoded")
         .body(format!("DBNum={}", num))
         .send()
-        .await?;
-    let res_text = response.text().await?;
-    let ammeter_data: AmmeterData = serde_json::from_str(&res_text)?;
-    let kwh = ammeter_data.service_key.parse::<i32>();
-    if ammeter_data.status_code != "200".to_string() || kwh.is_err() {
-        Ok(None)
+        .await
+        .map_err(|err| err.to_string())?;
+    let res_text = response.text().await.map_err(|err| err.to_string())?;
+    let ammeter_data: AmmeterData =
+        serde_json::from_str(&res_text).map_err(|err| err.to_string())?;
+    if let Ok(kwh) = ammeter_data.service_key.parse::<i32>() {
+        Ok(Some(kwh))
     } else {
-        Ok(Some(kwh.unwrap()))
+        Ok(None)
     }
 }
 
